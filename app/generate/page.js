@@ -42,8 +42,9 @@ export default function GeneratePage() {
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ updates, contentType, extraImages, month: currentMonth, year: currentYear })
       })
-      if (!res.ok) throw new Error('Generation failed')
-      const { id } = await res.json()
+      const result = await res.json()
+if (!res.ok) throw new Error(result.error || 'Generation failed')
+const { id } = result
       router.push(`/history?id=${id}`)
     } catch(e) { alert('Error: '+e.message); setGenerating(false) }
     finally { clearInterval(iv) }
