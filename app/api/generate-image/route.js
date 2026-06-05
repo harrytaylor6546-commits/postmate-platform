@@ -5,14 +5,39 @@ export async function POST(req) {
   if (!userId) return Response.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { prompt } = await req.json()
-  if (!prompt) return Response.json({ error: 'No prompt' }, { status: 400 })
+  if (!prompt) return Response.json({ error: 'No prompt provided' }, { status: 400 })
 
-  const res = await fetch('https://fal.run/fal-ai/flux/schnell', {
-    method: 'POST',
-    headers: { 'Authorization': `Key ${process.env.FAL_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, image_size: 'square_hd', num_inference_steps: 4, num_images: 1 })
-  })
-  const data = await res.json()
-  if (!res.ok) return Response.json({ error: data.detail || 'Failed' }, { status: 500 })
-  return Response.json({ url: data.images?.[0]?.url })
+  try {
+    const res = await fetch('https://api.together.xyz/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.TOGETHER_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'black-forest-labs/FLUX.1-schnell-Free',
+        prompt: prompt,
+        width: 1024,
+        height: 1024,
+        steps: 4,
+        n: 1,
+        response_format: 'url'
+      })
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      console.error('Together AI error:', data)
+      return Response.json({ error: data.error?.message || 'Image generation failed' }, { status: 500 })
+    }
+
+    const url = data.data?.[0]?.url
+    if (!url) return Response.json({ error: 'No image returned' }, { status: 500 })
+
+    return Response.json({ url })
+  } catch (err) {
+    console.error('Image generation error:', err)
+    return Response.json({ error: err.message }, { status: 500 })
+  }
 }
