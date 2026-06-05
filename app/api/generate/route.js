@@ -1,12 +1,33 @@
 import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '../../../lib/supabase'
 
-function extract(text, start, end) {
-  const si = text.indexOf(start)
+function extract(text, keywords, endKeywords) {
+  // Try multiple variations of the header
+  const variations = keywords.flatMap(k => [
+    `===${k}===`, `=== ${k} ===`, `## ${k}`, `# ${k}`,
+    `**${k}**`, k, k.toLowerCase(), k.toUpperCase()
+  ])
+  let si = -1, startLen = 0
+  for (const v of variations) {
+    const idx = text.indexOf(v)
+    if (idx !== -1) { si = idx; startLen = v.length; break }
+  }
   if (si === -1) return ''
-  const s = si + start.length
-  if (!end) return text.slice(s).trim()
-  const ei = text.indexOf(end, s)
+  const s = si + startLen
+
+  if (!endKeywords) return text.slice(s).trim()
+
+  let ei = -1
+  for (const ek of endKeywords) {
+    const endVariations = [
+      `===${ek}===`, `=== ${ek} ===`, `## ${ek}`, `# ${ek}`,
+      `**${ek}**`, ek, ek.toLowerCase(), ek.toUpperCase()
+    ]
+    for (const v of endVariations) {
+      const idx = text.indexOf(v, s)
+      if (idx !== -1 && (ei === -1 || idx < ei)) { ei = idx; break }
+    }
+  }
   return ei === -1 ? text.slice(s).trim() : text.slice(s, ei).trim()
 }
 
@@ -18,44 +39,6 @@ export async function POST(req) {
   const db = supabaseAdmin()
   const { data: profile } = await db.from('profiles').select('*').eq('clerk_user_id', userId).single()
   if (!profile) return Response.json({ error: 'Profile not found' }, { status: 404 })
-
-  const typePrompts = {
-    full: `Generate ALL sections with EXACT headers:
-===SOCIAL POSTS===
-16 posts. Each: POST [N] | [Instagram or Facebook] | [type: promotional/educational/engaging/behind-scenes]
-Caption: [full caption]
-Hashtags: [10 for Instagram, 3 for Facebook]
-Best time: [day and time]
-
-===EMAIL NEWSLETTERS===
-2 newsletters. Each:
-NEWSLETTER [N]
-Subject: [subject]
-Subject B: [A/B variant]
-Preview: [under 90 chars]
-Body:
-[350 word body]
-CTA: [button text]
-
-===GOOGLE POSTS===
-4 posts. Each:
-GOOGLE [N] | [offer/update/event/product]
-Copy: [150 words]
-CTA: [button]
-
-===BLOG POSTS===
-2 posts. Each:
-BLOG [N]
-Title: [SEO title]
-Meta: [meta description]
-Keyword: [target keyword]
-Outline:
-[H2/H3 sections]`,
-    social: '===SOCIAL POSTS===\n16 posts. Each: POST [N] | [platform] | [type]\nCaption: [full]\nHashtags: [10 IG/3 FB]\nBest time: [day+time]',
-    email: '===EMAIL NEWSLETTERS===\n2 newsletters. Each:\nNEWSLETTER [N]\nSubject: [subject]\nSubject B: [variant]\nPreview: [text]\nBody:\n[350 words]\nCTA: [button]',
-    google: '===GOOGLE POSTS===\n4 posts. Each:\nGOOGLE [N] | [type]\nCopy: [150 words]\nCTA: [button]',
-    blog: '===BLOG POSTS===\n2 posts. Each:\nBLOG [N]\nTitle: [SEO title]\nMeta: [desc]\nKeyword: [keyword]\nOutline:\n[H2/H3]'
-  }
 
   const prompt = `You are PostMate, a professional content manager for local businesses. Generate authentic, specific content — never generic.
 
@@ -76,11 +59,40 @@ ${updates.news ? `News: ${updates.news}` : ''}
 ${updates.highlights ? `Highlight: ${updates.highlights}` : ''}
 ${updates.avoid ? `Avoid: ${updates.avoid}` : ''}
 
-${(profile.images?.length + (extraImages?.length||0)) > 0 ? `BRAND IMAGES: ${profile.images?.length + (extraImages?.length||0)} image(s) provided. Reference brand visuals where relevant.` : ''}
+Generate content with these EXACT section headers (copy them exactly):
+===SOCIAL POSTS===
+Create 16 social media posts. For each post:
+POST [N] | [Instagram or Facebook] | [promotional/educational/engaging/behind-scenes]
+Caption: [full caption text]
+Hashtags: [10 for Instagram, 3 for Facebook]
+Best time: [day and time]
 
-${typePrompts[contentType] || typePrompts.full}
+===EMAIL NEWSLETTERS===
+Create 2 email newsletters. For each:
+NEWSLETTER [N]
+Subject: [subject line]
+Subject B: [A/B variant]
+Preview: [preview text under 90 chars]
+Body:
+[full 350 word body copy]
+CTA: [button text]
 
-Write specifically for ${profile.business_name} in ${profile.location}. Match the ${profile.voice} voice throughout.`
+===GOOGLE POSTS===
+Create 4 Google Business posts. For each:
+GOOGLE [N] | [offer/update/event/product]
+Copy: [150 word copy]
+CTA: [button type]
+
+===BLOG POSTS===
+Create 2 blog post outlines. For each:
+BLOG [N]
+Title: [SEO-optimised title]
+Meta: [meta description under 155 chars]
+Keyword: [target keyword]
+Outline:
+[H2 and H3 sections with brief notes]
+
+Write specifically for ${profile.business_name} in ${profile.location}. Match the ${profile.voice} brand voice throughout. Never be generic.`
 
   const allImages = [...(profile.images||[]), ...(extraImages||[])]
   const messageContent = [
@@ -97,15 +109,22 @@ Write specifically for ${profile.business_name} in ${profile.location}. Match th
   const data = await r.json()
   const raw = data.content?.map(b=>b.text||'').join('\n') || ''
 
+  // Flexible section extraction
+  const social = extract(raw, ['SOCIAL POSTS'], ['EMAIL NEWSLETTERS','EMAIL NEWSLETTER','NEWSLETTERS'])
+  const email = extract(raw, ['EMAIL NEWSLETTERS','EMAIL NEWSLETTER','NEWSLETTERS'], ['GOOGLE POSTS','GOOGLE POST','GOOGLE BUSINESS'])
+  const google = extract(raw, ['GOOGLE POSTS','GOOGLE POST','GOOGLE BUSINESS'], ['BLOG POSTS','BLOG POST','BLOG'])
+  const blog = extract(raw, ['BLOG POSTS','BLOG POST','BLOG'], null)
+
+  // Fallback: if sections are empty, store raw in social
   const sections = {
-    social: extract(raw,'===SOCIAL POSTS===','===EMAIL NEWSLETTERS==='),
-    email: extract(raw,'===EMAIL NEWSLETTERS===','===GOOGLE POSTS==='),
-    google: extract(raw,'===GOOGLE POSTS===','===BLOG POSTS==='),
-    blog: extract(raw,'===BLOG POSTS===',null),
+    social: social || raw,
+    email: email || '',
+    google: google || '',
+    blog: blog || '',
   }
 
   const { data: saved } = await db.from('content_history').insert({
-    clerk_user_id: userId, month, year, raw_content:raw, sections, updates, content_type:contentType
+    clerk_user_id: userId, month, year, raw_content:raw, sections, updates, content_type: contentType || 'full'
   }).select('id').single()
 
   return Response.json({ id: saved.id })
