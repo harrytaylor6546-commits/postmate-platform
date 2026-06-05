@@ -2,10 +2,8 @@ import { auth } from '@clerk/nextjs/server'
 import { supabaseAdmin } from '../../../lib/supabase'
 
 function extract(text, keywords, endKeywords) {
-  // Try multiple variations of the header
   const variations = keywords.flatMap(k => [
-    `===${k}===`, `=== ${k} ===`, `## ${k}`, `# ${k}`,
-    `**${k}**`, k, k.toLowerCase(), k.toUpperCase()
+    `===${k}===`, `=== ${k} ===`, `## ${k}`, `# ${k}`, `**${k}**`, k
   ])
   let si = -1, startLen = 0
   for (const v of variations) {
@@ -14,16 +12,11 @@ function extract(text, keywords, endKeywords) {
   }
   if (si === -1) return ''
   const s = si + startLen
-
   if (!endKeywords) return text.slice(s).trim()
-
   let ei = -1
   for (const ek of endKeywords) {
-    const endVariations = [
-      `===${ek}===`, `=== ${ek} ===`, `## ${ek}`, `# ${ek}`,
-      `**${ek}**`, ek, ek.toLowerCase(), ek.toUpperCase()
-    ]
-    for (const v of endVariations) {
+    const endV = [`===${ek}===`, `=== ${ek} ===`, `## ${ek}`, `# ${ek}`, `**${ek}**`, ek]
+    for (const v of endV) {
       const idx = text.indexOf(v, s)
       if (idx !== -1 && (ei === -1 || idx < ei)) { ei = idx; break }
     }
@@ -32,15 +25,25 @@ function extract(text, keywords, endKeywords) {
 }
 
 export async function POST(req) {
-  const { userId } = await auth()
-  if (!userId) return Response.json({ error: 'Unauthorised' }, { status: 401 })
+  try {
+    const { userId } = await auth()
+    if (!userId) return Response.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { updates, contentType, extraImages, month, year } = await req.json()
-  const db = supabaseAdmin()
-  const { data: profile } = await db.from('profiles').select('*').eq('clerk_user_id', userId).single()
-  if (!profile) return Response.json({ error: 'Profile not found' }, { status: 404 })
+    const { updates, contentType, extraImages, month, year } = await req.json()
+    const db = supabaseAdmin()
 
-  const prompt = `You are PostMate, a professional content manager for local businesses. Generate authentic, specific content — never generic.
+    const { data: profile, error: profileError } = await db
+      .from('profiles').select('*').eq('clerk_user_id', userId).single()
+
+    if (profileError) {
+      console.error('Profile fetch error:', profileError)
+      return Response.json({ error: 'Profile error: ' + profileError.message }, { status: 500 })
+    }
+    if (!profile) return Response.json({ error: 'Profile not found' }, { status: 404 })
+
+    console.log('Generating for:', profile.business_name)
+
+    const prompt = `You are PostMate, a professional AI content manager. Generate authentic content for this business.
 
 BUSINESS:
 Name: ${profile.business_name}
@@ -49,83 +52,100 @@ Location: ${profile.location}
 Voice: ${profile.voice}
 Offerings: ${profile.offerings}
 ${profile.audience ? `Customers: ${profile.audience}` : ''}
-${profile.instagram ? `Instagram: ${profile.instagram}` : ''}
-${profile.facebook ? `Facebook: ${profile.facebook}` : ''}
-${profile.website ? `Website: ${profile.website}` : ''}
 
 THIS MONTH (${month} ${year}):
-${updates.promotions ? `Promotions: ${updates.promotions}` : 'No specific promotions'}
-${updates.news ? `News: ${updates.news}` : ''}
-${updates.highlights ? `Highlight: ${updates.highlights}` : ''}
-${updates.avoid ? `Avoid: ${updates.avoid}` : ''}
+${updates?.promotions ? `Promotions: ${updates.promotions}` : 'No promotions'}
+${updates?.news ? `News: ${updates.news}` : ''}
 
-Generate content with these EXACT section headers (copy them exactly):
+Use these EXACT headers:
 ===SOCIAL POSTS===
-Create 16 social media posts. For each post:
-POST [N] | [Instagram or Facebook] | [promotional/educational/engaging/behind-scenes]
-Caption: [full caption text]
-Hashtags: [10 for Instagram, 3 for Facebook]
-Best time: [day and time]
+16 posts. Each: POST [N] | [Platform] | [Type]
+Caption: [text]
+Hashtags: [tags]
+Best time: [day + time]
 
 ===EMAIL NEWSLETTERS===
-Create 2 email newsletters. For each:
-NEWSLETTER [N]
-Subject: [subject line]
-Subject B: [A/B variant]
-Preview: [preview text under 90 chars]
-Body:
-[full 350 word body copy]
-CTA: [button text]
+2 newsletters. Each:
+Subject: [subject]
+Body: [300 words]
+CTA: [button]
 
 ===GOOGLE POSTS===
-Create 4 Google Business posts. For each:
-GOOGLE [N] | [offer/update/event/product]
-Copy: [150 word copy]
-CTA: [button type]
+4 posts. Each:
+Copy: [150 words]
+CTA: [button]
 
 ===BLOG POSTS===
-Create 2 blog post outlines. For each:
-BLOG [N]
-Title: [SEO-optimised title]
-Meta: [meta description under 155 chars]
-Keyword: [target keyword]
-Outline:
-[H2 and H3 sections with brief notes]
+2 outlines. Each:
+Title: [SEO title]
+Outline: [H2/H3 structure]
 
-Write specifically for ${profile.business_name} in ${profile.location}. Match the ${profile.voice} brand voice throughout. Never be generic.`
+Write for ${profile.business_name} in ${profile.location}. Use ${profile.voice} voice.`
 
-  const allImages = [...(profile.images||[]), ...(extraImages||[])]
-  const messageContent = [
-    ...allImages.map(img => ({ type:'image', source:{ type:'base64', media_type:img.type, data:img.data } })),
-    { type:'text', text:prompt }
-  ]
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
 
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json', 'x-api-key':process.env.ANTHROPIC_API_KEY, 'anthropic-version':'2023-06-01' },
-    body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, messages:[{ role:'user', content:messageContent }] })
-  })
+    const anthropicData = await anthropicRes.json()
+    console.log('Anthropic status:', anthropicRes.status)
+    console.log('Anthropic response type:', anthropicData.type)
 
-  const data = await r.json()
-  const raw = data.content?.map(b=>b.text||'').join('\n') || ''
+    if (anthropicData.error) {
+      console.error('Anthropic error:', anthropicData.error)
+      return Response.json({ error: 'AI error: ' + anthropicData.error.message }, { status: 500 })
+    }
 
-  // Flexible section extraction
-  const social = extract(raw, ['SOCIAL POSTS'], ['EMAIL NEWSLETTERS','EMAIL NEWSLETTER','NEWSLETTERS'])
-  const email = extract(raw, ['EMAIL NEWSLETTERS','EMAIL NEWSLETTER','NEWSLETTERS'], ['GOOGLE POSTS','GOOGLE POST','GOOGLE BUSINESS'])
-  const google = extract(raw, ['GOOGLE POSTS','GOOGLE POST','GOOGLE BUSINESS'], ['BLOG POSTS','BLOG POST','BLOG'])
-  const blog = extract(raw, ['BLOG POSTS','BLOG POST','BLOG'], null)
+    const raw = anthropicData.content?.map(b => b.text || '').join('\n') || ''
+    console.log('Raw content length:', raw.length)
+    console.log('Raw preview:', raw.substring(0, 200))
 
-  // Fallback: if sections are empty, store raw in social
-  const sections = {
-    social: social || raw,
-    email: email || '',
-    google: google || '',
-    blog: blog || '',
+    if (!raw) {
+      return Response.json({ error: 'No content generated. Check API key.' }, { status: 500 })
+    }
+
+    const social = extract(raw, ['SOCIAL POSTS'], ['EMAIL NEWSLETTERS', 'EMAIL NEWSLETTER'])
+    const email = extract(raw, ['EMAIL NEWSLETTERS', 'EMAIL NEWSLETTER'], ['GOOGLE POSTS', 'GOOGLE POST'])
+    const google = extract(raw, ['GOOGLE POSTS', 'GOOGLE POST'], ['BLOG POSTS', 'BLOG POST', 'BLOG'])
+    const blog = extract(raw, ['BLOG POSTS', 'BLOG POST', 'BLOG'], null)
+
+    console.log('Section lengths - social:', social.length, 'email:', email.length, 'google:', google.length, 'blog:', blog.length)
+
+    const sections = {
+      social: social || raw,
+      email: email || '(See Social tab for full content)',
+      google: google || '(See Social tab for full content)',
+      blog: blog || '(See Social tab for full content)',
+    }
+
+    const { data: saved, error: saveError } = await db.from('content_history').insert({
+      clerk_user_id: userId,
+      month, year,
+      raw_content: raw,
+      sections,
+      updates: updates || {},
+      content_type: contentType || 'full'
+    }).select('id').single()
+
+    if (saveError) {
+      console.error('Save error:', saveError)
+      return Response.json({ error: 'Save error: ' + saveError.message }, { status: 500 })
+    }
+
+    console.log('Saved history entry:', saved.id)
+    return Response.json({ id: saved.id })
+
+  } catch (err) {
+    console.error('Unexpected error:', err)
+    return Response.json({ error: err.message }, { status: 500 })
   }
-
-  const { data: saved } = await db.from('content_history').insert({
-    clerk_user_id: userId, month, year, raw_content:raw, sections, updates, content_type: contentType || 'full'
-  }).select('id').single()
-
-  return Response.json({ id: saved.id })
 }
