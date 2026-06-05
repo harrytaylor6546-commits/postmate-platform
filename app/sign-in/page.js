@@ -7,7 +7,10 @@ export default function SignInPage() {
         <div style={{ width:32, height:32, background:'#FF5C35', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800 }}>P</div>
         PostMate
       </div>
-      <SignIn appearance={{ variables: { colorPrimary: '#FF5C35', borderRadius: '4px' } }} />
+      <SignIn 
+        forceRedirectUrl="/dashboard"
+        appearance={{ variables: { colorPrimary: '#FF5C35' } }} 
+      />
     </div>
   )
 }
