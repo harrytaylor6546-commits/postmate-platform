@@ -226,6 +226,95 @@ function ImageCard({ prompt, num, theme }) {
   )
 }
 
+
+// ─── IMAGES SECTION ───────────────────────────────────────
+function ImagesSection({ active, imagePrompts }) {
+  const [loading, setLoading] = useState(false)
+  const [prompts, setPrompts] = useState(imagePrompts)
+  const [error, setError] = useState('')
+
+  async function generatePrompts() {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/generate-image-prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ historyId: active.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      // Re-parse the new prompts
+      const parsed = parseImagePrompts(data.images || '')
+      setPrompts(parsed)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontFamily: 'Syne,sans-serif', fontSize: 18, fontWeight: 800, color: '#0f0e17', marginBottom: 3 }}>Images</h2>
+          <p style={{ fontSize: 12, color: '#9a9090' }}>
+            {prompts.length > 0
+              ? prompts.length + ' image prompts — click Generate on each card to create the actual image'
+              : 'Generate AI image prompts for your posts, then create images with one click'}
+          </p>
+        </div>
+        <button
+          onClick={generatePrompts}
+          disabled={loading}
+          style={{ padding: '10px 22px', background: loading ? '#9a9090' : '#FF5C35', color: 'white', border: 'none', borderRadius: 100, fontSize: 13, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans,sans-serif', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}
+        >
+          {loading ? (
+            <>
+              <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .8s linear infinite', display: 'inline-block' }} />
+              Generating prompts...
+            </>
+          ) : (
+            <>✨ {prompts.length > 0 ? 'Regenerate Prompts' : 'Generate Image Prompts'}</>
+          )}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13, color: '#ef4444', marginBottom: 20 }}>
+          Error: {error}
+        </div>
+      )}
+
+      {prompts.length > 0 ? (
+        <>
+          <div style={{ padding: '10px 14px', background: 'rgba(255,92,53,0.06)', border: '1px solid rgba(255,92,53,0.15)', fontSize: 12, color: '#c2410c', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>ℹ️</span>
+            <span>Image generation requires a <strong>FAL_API_KEY</strong> in Vercel environment variables. Get one free at <a href="https://fal.ai" target="_blank" rel="noreferrer" style={{ color: '#FF5C35', fontWeight: 600 }}>fal.ai</a>. Without it, use the prompts in Canva, Midjourney or DALL-E.</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+            {prompts.map((item, i) => (
+              <ImageCard key={i} num={item.num} theme={item.theme} prompt={item.prompt} />
+            ))}
+          </div>
+        </>
+      ) : !loading && (
+        <div style={{ background: 'white', border: '1px solid rgba(15,14,23,0.08)', padding: '56px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 14 }}>🖼️</div>
+          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 17, fontWeight: 800, color: '#0f0e17', marginBottom: 8 }}>No image prompts yet</div>
+          <p style={{ fontSize: 13, color: '#9a9090', fontWeight: 300, maxWidth: 340, margin: '0 auto 24px', lineHeight: 1.6 }}>
+            Click the button above to generate 8 custom AI image prompts for your social posts. Uses your brand images as style reference.
+          </p>
+          <button onClick={generatePrompts} style={{ padding: '12px 28px', background: '#FF5C35', color: 'white', border: 'none', borderRadius: 100, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans,sans-serif' }}>
+            ✨ Generate Image Prompts
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── MAIN ─────────────────────────────────────────────────
 export default function HistoryClient({ history, active }) {
   const router = useRouter()
@@ -494,23 +583,7 @@ export default function HistoryClient({ history, active }) {
 
             {/* IMAGES */}
             {section === 'images' && (
-              <div>
-                <SectionHeader title="Images" subtitle="AI-generated images for your posts. Requires FAL_API_KEY in Vercel env vars." />
-                {imagePrompts.length > 0 ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-                    {imagePrompts.map((item, i) => (
-                      <ImageCard key={i} num={item.num} theme={item.theme} prompt={item.prompt} />
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ background: 'white', border: '1px solid rgba(15,14,23,0.08)', padding: '48px 24px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>🖼️</div>
-                    <div style={{ fontFamily: 'Syne,sans-serif', fontSize: 16, fontWeight: 700, color: '#0f0e17', marginBottom: 8 }}>No images yet</div>
-                    <p style={{ fontSize: 13, color: '#9a9090', fontWeight: 300, maxWidth: 320, margin: '0 auto 20px' }}>Generate new content to get AI image prompts alongside your posts.</p>
-                    <Link href="/generate" style={{ padding: '11px 24px', background: '#FF5C35', color: 'white', borderRadius: 100, fontSize: 13, fontWeight: 500, textDecoration: 'none', display: 'inline-block' }}>Generate Content</Link>
-                  </div>
-                )}
-              </div>
+              <ImagesSection active={active} imagePrompts={imagePrompts} />
             )}
 
           </div>
