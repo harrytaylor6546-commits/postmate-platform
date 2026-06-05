@@ -7,7 +7,10 @@ export default function SignUpPage() {
         <div style={{ width:32, height:32, background:'#FF5C35', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800 }}>P</div>
         PostMate
       </div>
-      <SignUp appearance={{ variables: { colorPrimary: '#FF5C35', borderRadius: '4px' } }} />
+      <SignUp 
+        forceRedirectUrl="/onboarding"
+        appearance={{ variables: { colorPrimary: '#FF5C35' } }} 
+      />
     </div>
   )
 }
