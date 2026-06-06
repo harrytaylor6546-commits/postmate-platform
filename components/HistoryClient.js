@@ -291,7 +291,7 @@ function ImagesSection({ active, imagePrompts }) {
         <>
           <div style={{ padding: '10px 14px', background: 'rgba(255,92,53,0.06)', border: '1px solid rgba(255,92,53,0.15)', fontSize: 12, color: '#c2410c', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>ℹ️</span>
-            <span>Image generation requires a <strong>TOGETHER_API_KEY</strong> in Vercel environment variables. Get one free at <a href="https://together.ai" target="_blank" rel="noreferrer" style={{ color: '#FF5C35', fontWeight: 600 }}>together.ai</a>. Without it, use the prompts in Canva, Midjourney or DALL-E.</span>
+            <span>Image generation requires a <strong>IDEOGRAM_API_KEY</strong> in Vercel environment variables. Get one free at <a href="https://ideogram.ai" target="_blank" rel="noreferrer" style={{ color: '#FF5C35', fontWeight: 600 }}>ideogram.ai</a>. Without it, use the prompts in Canva, Midjourney or DALL-E.</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
             {prompts.map((item, i) => (
