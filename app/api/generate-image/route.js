@@ -8,28 +8,28 @@ export async function POST(req) {
   if (!prompt) return Response.json({ error: 'No prompt provided' }, { status: 400 })
 
   try {
-    const res = await fetch('https://api.together.xyz/v1/images/generations', {
+    const res = await fetch('https://api.ideogram.ai/generate', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.TOGETHER_API_KEY}`,
+        'Api-Key': process.env.IDEOGRAM_API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'black-forest-labs/FLUX.1-schnell',
-        prompt: prompt,
-        width: 1024,
-        height: 1024,
-        steps: 4,
-        n: 1,
-        response_format: 'url'
+        image_request: {
+          prompt: prompt,
+          aspect_ratio: 'ASPECT_1_1',
+          model: 'V_2',
+          magic_prompt_option: 'AUTO',
+          style_type: 'REALISTIC'
+        }
       })
     })
 
     const data = await res.json()
 
     if (!res.ok) {
-      console.error('Together AI error:', data)
-      return Response.json({ error: data.error?.message || 'Image generation failed' }, { status: 500 })
+      console.error('Ideogram error:', data)
+      return Response.json({ error: data.error || 'Image generation failed' }, { status: 500 })
     }
 
     const url = data.data?.[0]?.url
