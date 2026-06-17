@@ -54,7 +54,7 @@ export default function OnboardingPage() {
     try {
       const res = await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, onboarding_complete: true }) })
       if (!res.ok) throw new Error('Failed to save')
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     } catch (e) { alert('Error: ' + e.message); setSaving(false) }
   }
 
