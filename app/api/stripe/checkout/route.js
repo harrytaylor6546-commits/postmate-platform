@@ -35,7 +35,7 @@ export async function POST(req) {
       subscription_data: {
         metadata: { clerk_user_id: userId, plan: planName },
       },
-      success_url: `${appUrl}/dashboard?subscribed=true`,
+      success_url: `${appUrl}/api/stripe/confirm?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/subscribe`,
       allow_promotion_codes: true,
     })
