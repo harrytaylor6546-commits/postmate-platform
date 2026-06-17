@@ -6,28 +6,19 @@ const PLANS = [
     id: 'starter',
     name: 'Starter',
     desc: 'Social media only',
-    monthly: { price: 59, priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID },
-    yearly: { price: 49, total: 588, save: 120, priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_YEARLY_PRICE_ID },
+    monthly: { price: 39, priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID },
+    yearly: { price: 26, total: 312, save: 156, priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_YEARLY_PRICE_ID },
     features: ['16 social posts / month', 'Instagram & Facebook captions', 'Hashtags + best posting times', 'AI image generation'],
     popular: false,
   },
   {
-    id: 'full',
-    name: 'Full Package',
+    id: 'pro',
+    name: 'Pro',
     desc: 'Everything included',
     monthly: { price: 99, priceId: process.env.NEXT_PUBLIC_STRIPE_FULL_PRICE_ID },
-    yearly: { price: 79, total: 948, save: 240, priceId: process.env.NEXT_PUBLIC_STRIPE_FULL_YEARLY_PRICE_ID },
+    yearly: { price: 65, total: 780, save: 408, priceId: process.env.NEXT_PUBLIC_STRIPE_FULL_YEARLY_PRICE_ID },
     features: ['16 social posts / month', '2 email newsletters (A/B subjects)', '4 Google Business posts', '2 SEO blog articles', '8 AI-generated images'],
     popular: true,
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    desc: 'For faster growth',
-    monthly: { price: 149, priceId: process.env.NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID },
-    yearly: { price: 119, total: 1428, save: 360, priceId: process.env.NEXT_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID },
-    features: ['24 social posts / month', '4 email newsletters', '4 Google Business posts', '4 SEO blog articles', 'Priority support'],
-    popular: false,
   },
 ]
 
@@ -68,7 +59,7 @@ export default function SubscribePage() {
           Choose your plan
         </h1>
         <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.5)', fontWeight: 300, maxWidth: 460, margin: '0 auto' }}>
-          Pay monthly and cancel anytime, or pay yearly and get two months free.
+          Pay monthly and cancel anytime, or pay yearly and save up to 34%.
         </p>
 
         {/* Billing toggle */}
@@ -78,7 +69,7 @@ export default function SubscribePage() {
           </button>
           <button onClick={() => setBilling('yearly')} style={{ padding: '10px 24px', borderRadius: 100, fontSize: 13, fontWeight: 600, fontFamily: 'DM Sans, sans-serif', border: 'none', cursor: 'pointer', background: billing === 'yearly' ? 'white' : 'transparent', color: billing === 'yearly' ? '#0f0e17' : 'rgba(255,255,255,0.5)', transition: 'all .2s', display: 'flex', alignItems: 'center', gap: 8 }}>
             Yearly
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#FF5C35', letterSpacing: '.04em' }}>2 MONTHS FREE</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#FF5C35', letterSpacing: '.04em' }}>SAVE 34%</span>
           </button>
         </div>
       </div>
@@ -142,7 +133,7 @@ export default function SubscribePage() {
       {/* Trust signals */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
-          {['Cancel monthly plans anytime', 'Secure payment via Stripe', 'Generate your first month tonight'].map(t => (
+          {['Cancel anytime', '14-day money-back guarantee', 'Secure payment via Stripe'].map(t => (
             <div key={t} style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ color: '#FF5C35' }}>✓</span>{t}
             </div>
