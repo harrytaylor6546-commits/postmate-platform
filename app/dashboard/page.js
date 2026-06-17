@@ -12,6 +12,7 @@ export default async function DashboardPage() {
   const db = supabaseAdmin()
   const { data: profile } = await db.from('profiles').select('*').eq('clerk_user_id', userId).single()
   if (!profile?.onboarding_complete) redirect('/onboarding')
+  if (profile.plan !== 'active') redirect('/subscribe')
 
   const { data: history } = await db.from('content_history').select('id,month,year,created_at').eq('clerk_user_id', userId).order('created_at', { ascending: false }).limit(5)
 
