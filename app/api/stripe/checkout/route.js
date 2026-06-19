@@ -15,8 +15,16 @@ export async function POST(req) {
     const db = supabaseAdmin()
     const { data: profile } = await db.from('profiles').select('*').eq('clerk_user_id', userId).single()
 
-    // Get or create Stripe customer
+ // Get or create Stripe customer (and verify the saved one still exists in this mode)
     let customerId = profile?.stripe_customer_id
+    if (customerId) {
+      try {
+        const existing = await stripe.customers.retrieve(customerId)
+        if (existing.deleted) customerId = null
+      } catch (e) {
+        customerId = null
+      }
+    }
     if (!customerId) {
       const customer = await stripe.customers.create({
         metadata: { clerk_user_id: userId },
@@ -24,7 +32,6 @@ export async function POST(req) {
       customerId = customer.id
       await db.from('profiles').update({ stripe_customer_id: customerId }).eq('clerk_user_id', userId)
     }
-
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://postmate-platform-syka.vercel.app'
 
     const session = await stripe.checkout.sessions.create({
